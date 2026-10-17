@@ -11,7 +11,7 @@ import {
   NoSubscriberBehavior,
   StreamType
 } from '@discordjs/voice';
-import { ActivityType } from 'discord.js';
+import { ActivityType, Routes } from 'discord.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -234,8 +234,8 @@ export class RadioPlayer {
     }
   }
 
-  // Update Discord activity status
-  updatePresence() {
+  // Update Discord activity status and Voice Channel Status
+  async updatePresence() {
     if (!this.client.user) return;
     if (this.currentTrack) {
       this.client.user.setPresence({
@@ -245,6 +245,19 @@ export class RadioPlayer {
         }],
         status: 'online'
       });
+
+      // Update Voice Channel Status (visible at the top of the voice channel: "Set a channel status")
+      if (this.channelId) {
+        try {
+          const categoryTag = this.currentTrack.category === 'aoe' ? '🗡️ AoE II' : '🔥 Guarida';
+          const statusText = `🎶 ${this.currentTrack.title} [${categoryTag}]`;
+          await this.client.rest.put(Routes.channelVoiceStatus(this.channelId), {
+            body: { status: statusText.slice(0, 100) }
+          });
+        } catch (err) {
+          // Non-critical, ignore if permissions are missing or rate limited
+        }
+      }
     } else {
       this.client.user.setPresence({
         activities: [{
@@ -253,6 +266,13 @@ export class RadioPlayer {
         }],
         status: 'idle'
       });
+      if (this.channelId) {
+        try {
+          await this.client.rest.put(Routes.channelVoiceStatus(this.channelId), {
+            body: { status: '📻 DJ Valeria 24/7 | La Guarida & AoE II' }
+          });
+        } catch (err) {}
+      }
     }
   }
 
