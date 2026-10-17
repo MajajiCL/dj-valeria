@@ -22,6 +22,14 @@ export const slashCommands = [
     .setDescription('Recarga la carpeta de canciones sin reiniciar el bot'),
 
   new SlashCommandBuilder()
+    .setName('actualizar')
+    .setDescription('Descarga canciones nuevas desde la web de La Guarida y actualiza la radio'),
+
+  new SlashCommandBuilder()
+    .setName('ayuda')
+    .setDescription('Muestra los comandos disponibles y la web de DJ Valeria'),
+
+  new SlashCommandBuilder()
     .setName('radio')
     .setDescription('Fuerza a DJ Valeria a unirse al canal de voz y empezar a tocar')
 ];
@@ -90,10 +98,43 @@ export async function handleInteraction(interaction, radioPlayer) {
     return interaction.reply({ embeds: [embed] });
   }
 
-  if (commandName === 'rescan') {
+  if (commandName === 'rescan' || commandName === 'actualizar') {
+    await interaction.deferReply({ ephemeral: false });
+    const syncRes = await radioPlayer.syncRemoteTracks();
     radioPlayer.scanTracks();
     radioPlayer.refillQueue();
-    return interaction.reply({ content: `🔄 Biblioteca re-escaneada con éxito. Total: **${radioPlayer.playlist.length} canciones**.`, ephemeral: true });
+
+    const embed = new EmbedBuilder()
+      .setColor(0x9B59B6)
+      .setTitle('🔄 Sincronización de DJ Valeria')
+      .setDescription(`La radio se sincronizó con el servidor y la web oficial.`)
+      .addFields(
+        { name: 'Nuevas Pistas Descargadas', value: `${syncRes.downloaded}`, inline: true },
+        { name: 'Total Biblioteca', value: `${radioPlayer.playlist.length} canciones`, inline: true },
+        { name: 'Panel Web Creadores', value: '[laguaridadelnoob.cl/dj](https://laguaridadelnoob.cl/dj)', inline: false }
+      )
+      .setFooter({ text: 'Tío Alex & La Guarida del Noob' });
+
+    return interaction.editReply({ embeds: [embed] });
+  }
+
+  if (commandName === 'ayuda') {
+    const embed = new EmbedBuilder()
+      .setColor(0xF1C40F)
+      .setTitle('🎧 DJ Valeria 24/7 • Panel de Ayuda')
+      .setDescription('Radio oficial continua para La Guarida del Noob & Age of Empires II.')
+      .addFields(
+        { name: '`/nowplaying`', value: 'Ver la canción actual y su categoría', inline: true },
+        { name: '`/queue`', value: 'Ver las próximas canciones en la cola aleatoria', inline: true },
+        { name: '`/skip`', value: 'Saltar a la siguiente pista de inmediato', inline: true },
+        { name: '`/tracks`', value: 'Ver el conteo total de temas por categoría', inline: true },
+        { name: '`/actualizar`', value: 'Sincronizar canciones subidas desde la web', inline: true },
+        { name: '`/radio`', value: 'Invocar o mover a DJ Valeria a tu canal de voz', inline: true },
+        { name: '🌐 Web Oficial & Estudio de Carga', value: 'Entra a [laguaridadelnoob.cl/dj](https://laguaridadelnoob.cl/dj) para subir canciones nuevas.' }
+      )
+      .setFooter({ text: 'Canal oficial: 🔊📣│zona-en-vivo🎮🔥' });
+
+    return interaction.reply({ embeds: [embed] });
   }
 
   if (commandName === 'radio') {

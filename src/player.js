@@ -34,9 +34,62 @@ export class RadioPlayer {
     this.currentTrack = null;
     this.isPlaying = false;
     this.reconnectAttempts = 0;
-    this.maxReconnectAttempts = 10;
-
     this._setupPlayerListeners();
+
+    // Sincronización remota periódica con la web (cada 5 minutos)
+    this.syncRemoteTracks().catch(() => {});
+    setInterval(() => {
+      this.syncRemoteTracks().catch(() => {});
+    }, 5 * 60 * 1000);
+  }
+
+  // Synchronize remote tracks uploaded via https://laguaridadelnoob.cl/dj
+  async syncRemoteTracks() {
+    try {
+      const manifestUrl = 'https://laguaridadelnoob.cl/dj/upload.php';
+      const res = await fetch(manifestUrl, {
+        headers: {
+          'User-Agent': 'DJValeria/1.0 (+https://laguaridadelnoob.cl/dj)',
+          'Accept': 'application/json'
+        }
+      });
+      if (!res.ok) return { downloaded: 0, total: this.playlist.length };
+      const data = await res.json();
+      if (!data || !Array.isArray(data.tracks)) return { downloaded: 0, total: this.playlist.length };
+
+      let downloaded = 0;
+      for (const track of data.tracks) {
+        if (!track.filename || !track.url) continue;
+        const targetCategoryDir = path.join(TRACKS_DIR, track.category === 'aoe' ? 'aoe' : 'laguarida');
+        if (!fs.existsSync(targetCategoryDir)) {
+          fs.mkdirSync(targetCategoryDir, { recursive: true });
+        }
+        const targetPath = path.join(targetCategoryDir, track.filename);
+        if (!fs.existsSync(targetPath)) {
+          console.log(`[RadioPlayer] 📥 Descargando nueva pista desde web: ${track.title} (${track.filename})...`);
+          const fileRes = await fetch(track.url, {
+            headers: { 'User-Agent': 'DJValeria/1.0' }
+          });
+          if (fileRes.ok) {
+            const buffer = Buffer.from(await fileRes.arrayBuffer());
+            fs.writeFileSync(targetPath, buffer);
+            downloaded++;
+            console.log(`[RadioPlayer] ✅ Descargada con éxito: ${track.title}`);
+          }
+        }
+      }
+
+      if (downloaded > 0) {
+        this.scanTracks();
+        this.refillQueue();
+        console.log(`[RadioPlayer] 🎉 Biblioteca actualizada: ${downloaded} nuevas canciones añadidas.`);
+      }
+
+      return { downloaded, total: this.playlist.length };
+    } catch (err) {
+      console.warn('[RadioPlayer] Aviso al sincronizar pistas remotas:', err.message);
+      return { downloaded: 0, total: this.playlist.length };
+    }
   }
 
   // Scan all supported audio files recursively in tracks/
