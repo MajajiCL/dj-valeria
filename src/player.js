@@ -60,13 +60,40 @@ export class RadioPlayer {
       let downloaded = 0;
       for (const track of data.tracks) {
         if (!track.filename || !track.url) continue;
-        const targetCategoryDir = path.join(TRACKS_DIR, track.category === 'aoe' ? 'aoe' : 'laguarida');
+
+        // Sanitización estricta de nombre de archivo (Anti-Path Traversal)
+        const safeFilename = path.basename(track.filename).replace(/[^a-zA-Z0-9_\-\.]/g, '');
+        if (!safeFilename || safeFilename.includes('..') || !/\.(mp3|wav|flac|ogg|m4a)$/i.test(safeFilename)) {
+          console.warn(`[RadioPlayer] ⚠️ Archivo remoto sospechoso o extensión no permitida: ${track.filename}`);
+          continue;
+        }
+
+        // Validar que la URL provenga estrictamente del dominio oficial
+        try {
+          const parsedUrl = new URL(track.url);
+          if (parsedUrl.hostname !== 'laguaridadelnoob.cl') {
+            console.warn(`[RadioPlayer] ⚠️ URL remota no autorizada: ${track.url}`);
+            continue;
+          }
+        } catch {
+          continue;
+        }
+
+        const category = track.category === 'aoe' ? 'aoe' : 'laguarida';
+        const targetCategoryDir = path.join(TRACKS_DIR, category);
         if (!fs.existsSync(targetCategoryDir)) {
           fs.mkdirSync(targetCategoryDir, { recursive: true });
         }
-        const targetPath = path.join(targetCategoryDir, track.filename);
+
+        const targetPath = path.resolve(targetCategoryDir, safeFilename);
+        // Garantizar que la ruta de destino resida estrictamente dentro de TRACKS_DIR
+        if (!targetPath.startsWith(path.resolve(TRACKS_DIR))) {
+          console.warn(`[RadioPlayer] ⚠️ Intento de path traversal bloqueado: ${targetPath}`);
+          continue;
+        }
+
         if (!fs.existsSync(targetPath)) {
-          console.log(`[RadioPlayer] 📥 Descargando nueva pista desde web: ${track.title} (${track.filename})...`);
+          console.log(`[RadioPlayer] 📥 Descargando nueva pista verificada: ${track.title} (${safeFilename})...`);
           const fileRes = await fetch(track.url, {
             headers: { 'User-Agent': 'DJValeria/1.0' }
           });

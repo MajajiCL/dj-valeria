@@ -1,0 +1,25 @@
+# Desactivar completamente la ejecución de scripts en el directorio de subidas
+php_flag engine off
+<IfModule mod_php7.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
+
+# Impedir que cualquier archivo se interprete como ejecutable
+RemoveHandler .php .phtml .php3 .php4 .php5 .php7 .phps .cgi .pl .py .sh .bash
+RemoveType .php .phtml .php3 .php4 .php5 .php7 .phps .cgi .pl .py .sh .bash
+
+<FilesMatch "\.(php|phtml|php3|php4|php5|php7|phps|cgi|pl|py|sh|bash|exe|bat)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Proteger archivos de configuración interna y rate limits
+<FilesMatch "^\.">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+Options -ExecCGI -Indexes
